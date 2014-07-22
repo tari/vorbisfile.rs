@@ -1,3 +1,6 @@
+env:
+  global:
+    - secure: e5YPYD8r6oRY0bNVDUzptaRD1rsuj4FkXWMYRjk48OyR6XecsVqyCBgH63o7SyfZ2n9wMcGxiyFJrl4vBsUrj+ZC07pQsQFo/vT6KjCeop1S/fxSOyRGUh9hbN+/vEm/NQ2uKaslo2OHWCHe9vCGtXD8n3p3U6Dn0goORe7S80k=
 before_install:
   - sudo add-apt-repository --yes ppa:hansjorg/rust
   - sudo add-apt-repository --yes ppa:cmrx64/cargo
@@ -9,3 +12,5 @@ script:
   - cargo test
   - rustdoc --test -L target/ src/lib.rs
   - rustdoc src/lib.rs
+after_script:
+  - curl http://www.rust-ci.org/artifacts/put?t=$RUSTCI_TOKEN | sh
