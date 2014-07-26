@@ -1,6 +1,6 @@
 #![allow(dead_code, missing_doc, uppercase_variables)]
 
-use libc::{c_void, c_int, c_long, size_t, c_float, c_char};
+use libc::{c_void, c_int, c_long, size_t, c_float, c_double, c_char};
 
 // There's a lot of leakage from libvorbis into libvorbisfile.
 // TODO expose both libvorbis and libvorbisfile APIs.
@@ -34,6 +34,7 @@ pub static OV_ENOSEEK: c_int = -138;
 #[repr(C)]
 pub struct OggVorbis_File {
     pub datasource: *mut c_void,
+    seekable: c_int,
     offset: i64,
     end: i64,
     oy: ogg_sync_state,
@@ -41,7 +42,7 @@ pub struct OggVorbis_File {
     links: int,
     offsets: *mut i64,
     dataoffsets: *mut i64,
-    serialnos: c_long,
+    serialnos: *mut c_long,
     pcmlengths: *mut i64,
     vi: *mut vorbis_info,
     vc: *mut vorbis_comment,
@@ -51,8 +52,8 @@ pub struct OggVorbis_File {
     current_serialno: c_long,
     current_link: c_int,
 
-    bittrack: i64,
-    samptrack: i64,
+    bittrack: c_double,
+    samptrack: c_double,
 
     os: ogg_stream_state,
     vd: vorbis_dsp_state,
@@ -202,5 +203,7 @@ pub struct vorbis_dsp_state {
     time_bits: i64,
     floor_bits: i64,
     res_bits: i64,
+
+    backend_state: *mut c_void,
 }
 

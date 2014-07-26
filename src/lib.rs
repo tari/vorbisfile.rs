@@ -5,6 +5,7 @@
 
 //! Ogg Vorbis file decoding, library bindings.
 
+extern crate debug;
 extern crate libc;
 use libc::{c_void, c_int, c_long, size_t};
 
@@ -67,24 +68,27 @@ impl OVError {
 }
 
 /// Ogg Vorbis file decoder.
-pub struct VorbisFile<'a> {
+pub struct VorbisFile {
     // The FFI member holds a pointer to this box.
     // Use a trait object because generic foreign functions are not allowed.
     src: Box<Reader>,
     decoder: ffi::OggVorbis_File,
     // Totally not 'static, but need a lifetime specifier to get a slice.
-    channels: Vec<&'a [f32]>,
+    channels: Vec<&'static [f32]>,
 }
 
 /// Read `nmemb` items into `ptr` of `size` bytes each.
 /// 
 /// If 0 is returned, error status is implied by errno. If nonzero, there was
 /// a read error. Otherwise, reached EOF.
-extern "C" fn read(ptr: *mut c_void, size: size_t, nmemb: size_t, datasource: *mut c_void) -> size_t {
-    let src = unsafe {
-        &mut *(datasource as *mut Box<Reader>)
-    };
-    let ptr = ptr as *mut u8;
+/// 
+/// TODO these functions should be parameterized over R in VorbisFile<R>, which obviates the need
+/// for type erasure, which in currently puts us in an ugly position where we need to get a raw
+/// pointer to a trait object (which doesn't work well without DSTs).
+/// Depends on Rust PR #15831.
+extern "C" fn read(buffer: *mut c_void, size: size_t, nmemb: size_t, datasource: *mut c_void) -> size_t {
+    let src: &mut Box<Reader> = unsafe { mem::transmute(datasource) };
+    let ptr = buffer as *mut u8;
 
     for i in range(0, nmemb) {
         let more = unsafe {
@@ -126,7 +130,7 @@ extern "C" fn tell(datasource: *mut c_void) -> c_long {
 //
 // Don't expose ov_fopen and friends because that won't play nicely
 // with non-libnative runtime.
-impl<'a> VorbisFile<'a> {
+impl VorbisFile {
     /// Ensures the FFI struct is consistent for callback invocation.
     ///
     /// Because the user may move this struct, the `datasource` pointer
@@ -134,18 +138,15 @@ impl<'a> VorbisFile<'a> {
     /// should be called before FFI actions that might fire callbacks to ensure
     /// the self-pointer is valid.
     fn callback_setup(&mut self) {
-        let ds =  &mut self.src as *mut Box<Reader> as *mut c_void;
-        debug_assert!(ds == self.decoder.datasource);
+        let ds = &mut self.src as *mut _ as *mut c_void;
         self.decoder.datasource = ds;
     }
 
     /// Create a Ogg Vorbis decoder.
-    pub fn new<R: Reader+'static>(src: R) -> OVResult<VorbisFile<'a>> {
+    pub fn new<R: Reader+'static>(src: R) -> OVResult<VorbisFile> {
         let mut vf = VorbisFile {
             src: box src as Box<Reader>,
-            decoder: unsafe {
-                mem::uninitialized()
-            },
+            decoder: unsafe { mem::uninitialized() },
             channels: Vec::new()
         };
         let callbacks = ffi::ov_callbacks {
@@ -156,8 +157,9 @@ impl<'a> VorbisFile<'a> {
         };
 
         let status = unsafe {
-            ffi::ov_open_callbacks(&mut vf.src as *mut Box<Reader> as *mut c_void, 
-                                   &mut vf.decoder, ptr::mut_null(), 0, callbacks)
+            ffi::ov_open_callbacks(&mut vf.src as *mut _ as *mut c_void, 
+                                   &mut vf.decoder as *mut _,
+                                   ptr::mut_null(), 0, callbacks)
         };
 
         match status {
@@ -176,7 +178,7 @@ impl<'a> VorbisFile<'a> {
     ///
     /// The emitted values are a slice of channels, each containing an equal
     /// number of samples.
-    pub fn decode(&'a mut self) -> OVResult<&'a [&'a [f32]]> {
+    pub fn decode<'a>(&'a mut self) -> OVResult<&'a [&'a [f32]]> {
         let max_samples = 4096;
         self.callback_setup();
         let mut sample_buffer: *mut *mut f32 = unsafe {
