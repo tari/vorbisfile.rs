@@ -15,6 +15,8 @@ extern "C" {
                          samples: c_int, bitstream: *mut c_int) -> c_long;
 
     pub fn ov_info(vf: *mut OggVorbis_File, link: c_int) -> *const vorbis_info;
+
+    pub fn ov_clear(vf: *mut OggVorbis_File) -> c_int;
 }
 
 pub static OV_FALSE: c_int = -1;

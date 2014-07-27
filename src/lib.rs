@@ -2,6 +2,7 @@
 #![doc(html_root_url = "http://www.rust-ci.org/tari/vorbisfile.rs/doc/libvorbisfile/")]
 
 #![deny(dead_code, missing_doc)]
+#![feature(unsafe_destructor)]
 
 //! Ogg Vorbis file decoding, library bindings.
 
@@ -216,5 +217,15 @@ impl VorbisFile {
             };
         }
         Ok(self.channels.as_slice())
+    }
+}
+
+#[unsafe_destructor]
+impl Drop for VorbisFile {
+    fn drop(&mut self) {
+        self.callback_setup();
+        unsafe {
+            ffi::ov_clear(&mut self.decoder);
+        }
     }
 }

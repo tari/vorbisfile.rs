@@ -15,13 +15,18 @@ fn main() {
     let res = vf.decode();
     match res {
         Ok(channels) => {
-            println!("{} channels x {} samples", channels.len(), channels[0].len());
+            println!("Input has {} channel{}", channels.len(),
+                     if channels.len() != 1 {
+                         "s"
+                     } else {
+                         ""
+                     });
         }
         Err(EndOfStream) => {
             return;
         },
         Err(e) => {
-            println!("Execpected decode error: {}", e);
+            println!("Error decoding input: {}", e);
             return;
         }
     }
