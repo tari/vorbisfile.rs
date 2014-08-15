@@ -10,7 +10,9 @@ extern crate debug;
 extern crate libc;
 use libc::{c_void, c_int, c_long, size_t};
 
+use std::c_str::CString;
 use std::mem;
+use std::str;
 use std::ptr;
 use std::raw;
 use std::slice::raw::mut_buf_as_slice;
@@ -76,6 +78,14 @@ pub struct VorbisFile<R> {
     channels: Vec<&'static [f32]>,
 }
 
+/// File metadata
+pub struct Comments<'a> {
+    /// The Vorbis implementation that encoded the stream.
+    pub vendor: CString,
+    /// User-specified key-value pairs of the form KEY=VALUE.
+    pub comments: Vec<&'a str>
+}
+
 #[allow(unused_variable)]
 extern "C" fn seek(datasource: *mut c_void, offset: i64, whence: c_int) -> c_int {
     // TODO permit seeking
@@ -136,6 +146,53 @@ impl<R: Reader> VorbisFile<R> {
                 Err(OVError::from_native(f))
             }
         }
+    }
+
+    /// Gets the comment struct for the specified bitstream.
+    ///
+    /// For nonseekable streams, returns the comments for the current
+    /// bitstream. Otherwise, specify bitstream -1 to get the current
+    /// bitstream.
+    pub fn comment<'a>(&'a mut self, link: int) -> Option<Comments<'a>> {
+        let cm = unsafe {
+            let p = ffi::ov_comment(&mut self.decoder, link as c_int);
+            if p.is_null() {
+                return None;
+            } else {
+                *p
+            }
+        };
+
+        unsafe fn make_str<'a>(data: *const u8, len: uint) -> Option<&'a str> {
+            let slice = raw::Slice {
+                data: data,
+                len: len
+            };
+            str::from_utf8(mem::transmute(slice))
+        }
+
+        Some(Comments {
+            vendor: unsafe {
+                CString::new(cm.vendor as *const _, false)
+            },
+            comments: unsafe {
+                let mut v = Vec::with_capacity(cm.comments as uint);
+                for i in range(0, cm.comments) {
+                    let len = *cm.comment_lengths.offset(i as int);
+                    match make_str(*cm.user_comments.offset(i as int) as *const _,
+                                   len as uint) {
+                        Some(s) => {
+                            v.push(s);
+                        }
+                        None => {
+                            // Ignore. Vorbis specifies all comment data is valid
+                            // UTF-8, but we need to protect against invalid input
+                        }
+                    }
+                }
+                v
+            }
+        })
     }
 
     /// Decode a block of samples.

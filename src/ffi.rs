@@ -17,6 +17,8 @@ extern "C" {
     pub fn ov_info(vf: *mut OggVorbis_File, link: c_int) -> *const vorbis_info;
 
     pub fn ov_clear(vf: *mut OggVorbis_File) -> c_int;
+
+    pub fn ov_comment(vf: *mut OggVorbis_File, link: c_int) -> *const vorbis_comment;
 }
 
 pub static OV_FALSE: c_int = -1;
@@ -110,10 +112,10 @@ pub struct alloc_chain {
 
 #[repr(C)]
 pub struct vorbis_comment {
-    user_comments: *mut *mut c_char,
-    comment_lengths: *mut c_int,
-    comments: c_int,
-    vendor: *mut c_char,
+    pub user_comments: *mut *mut c_char,
+    pub comment_lengths: *mut c_int,
+    pub comments: c_int,
+    pub vendor: *mut c_char,
 }
 
 #[repr(C)]

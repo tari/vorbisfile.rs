@@ -13,6 +13,32 @@ fn main() {
     };
     let mut prev_channels = 0;
 
+    match vf.comment(-1) {
+        Some(mut comments) => {
+            println!("Encoded by {}", comments.vendor);
+            println!("File comments:");
+            comments.comments.sort();
+            for comment in comments.comments.iter() {
+                match comment.find('=') {
+                    None => {
+                        println!("\t {}", comment);
+                    }
+                    Some(i) => {
+                        println!("\t {}: {}", comment.slice_to(i),
+                                 if i < comment.len() {
+                                     comment.slice_from(i + 1)
+                                 } else {
+                                     ""
+                                 });
+                    }
+                }
+            }
+        }
+        None => {
+            println!("Failed to get stream comments.");
+        }
+    }
+
     loop {
         let res = vf.decode();
         match res {
