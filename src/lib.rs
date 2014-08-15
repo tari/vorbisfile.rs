@@ -69,45 +69,11 @@ impl OVError {
 }
 
 /// Ogg Vorbis file decoder.
-pub struct VorbisFile {
-    // The FFI member holds a pointer to this box.
-    // Use a trait object because generic foreign functions are not allowed.
-    src: Box<Reader>,
+pub struct VorbisFile<R> {
+    src: R,
     decoder: ffi::OggVorbis_File,
     // Totally not 'static, but need a lifetime specifier to get a slice.
     channels: Vec<&'static [f32]>,
-}
-
-/// Read `nmemb` items into `ptr` of `size` bytes each.
-/// 
-/// If 0 is returned, error status is implied by errno. If nonzero, there was
-/// a read error. Otherwise, reached EOF.
-/// 
-/// TODO these functions should be parameterized over R in VorbisFile<R>, which obviates the need
-/// for type erasure, which in currently puts us in an ugly position where we need to get a raw
-/// pointer to a trait object (which doesn't work well without DSTs).
-/// Depends on Rust PR #15831.
-extern "C" fn read(buffer: *mut c_void, size: size_t, nmemb: size_t, datasource: *mut c_void) -> size_t {
-    let src: &mut Box<Reader> = unsafe { mem::transmute(datasource) };
-    let ptr = buffer as *mut u8;
-
-    for i in range(0, nmemb) {
-        let more = unsafe {
-            mut_buf_as_slice(ptr.offset(i as int), size as uint, |buf| {
-                match src.read_at_least(size as uint, buf) {
-                    Ok(_) => true,
-                    // Assume errno is set under the covers.
-                    Err(_) => false
-                }
-            })
-        };
-        if !more {
-            // Got error, which might be EOF.
-            return i;
-        }
-    }
-    // Completed successfully
-    return nmemb;
 }
 
 #[allow(unused_variable)]
@@ -126,12 +92,9 @@ extern "C" fn tell(datasource: *mut c_void) -> c_long {
     -1
 }
 
-// Lifetime bound on `src` is necessary because ffi::OggVorbis_File holds
-// a reference to it, so it must never move as long as this is alive.
-//
 // Don't expose ov_fopen and friends because that won't play nicely
 // with non-libnative runtime.
-impl VorbisFile {
+impl<R: Reader> VorbisFile<R> {
     /// Ensures the FFI struct is consistent for callback invocation.
     ///
     /// Because the user may move this struct, the `datasource` pointer
@@ -139,19 +102,19 @@ impl VorbisFile {
     /// should be called before FFI actions that might fire callbacks to ensure
     /// the self-pointer is valid.
     fn callback_setup(&mut self) {
-        let ds = &mut self.src as *mut _ as *mut c_void;
+        let ds = self as *mut _ as *mut c_void;
         self.decoder.datasource = ds;
     }
 
     /// Create a Ogg Vorbis decoder.
-    pub fn new<R: Reader+'static>(src: R) -> OVResult<VorbisFile> {
+    pub fn new(src: R) -> OVResult<VorbisFile<R>> {
         let mut vf = VorbisFile {
-            src: box src as Box<Reader>,
+            src: src,
             decoder: unsafe { mem::uninitialized() },
             channels: Vec::new()
         };
         let callbacks = ffi::ov_callbacks {
-            read: read,
+            read: VorbisFile::<R>::read,
             seek: seek,
             tell: tell,
             close: close,
@@ -218,10 +181,38 @@ impl VorbisFile {
         }
         Ok(self.channels.as_slice())
     }
+
+    /// Read `nmemb` items into `ptr` of `size` bytes each.
+    /// 
+    /// If 0 is returned, error status is implied by errno. If nonzero, there was
+    /// a read error. Otherwise, reached EOF.
+    extern "C" fn read(buffer: *mut c_void, size: size_t, nmemb: size_t,
+                       datasource: *mut c_void) -> size_t {
+        let vf: &mut VorbisFile<R> = unsafe { mem::transmute(datasource) };
+        let ptr = buffer as *mut u8;
+
+        for i in range(0, nmemb) {
+            let more = unsafe {
+                mut_buf_as_slice(ptr.offset(i as int), size as uint, |buf| {
+                    match vf.src.read_at_least(size as uint, buf) {
+                        Ok(_) => true,
+                        // Assume errno is set under the covers.
+                        Err(_) => false
+                    }
+                })
+            };
+            if !more {
+                // Got error, which might be EOF.
+                return i;
+            }
+        }
+        // Completed successfully
+        return nmemb;
+    }
 }
 
 #[unsafe_destructor]
-impl Drop for VorbisFile {
+impl<R: Reader> Drop for VorbisFile<R> {
     fn drop(&mut self) {
         self.callback_setup();
         unsafe {

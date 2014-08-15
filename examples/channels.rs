@@ -7,27 +7,32 @@ fn main() {
     let mut vf = match VorbisFile::new(io::stdin()) {
         Ok(f) => f,
         Err(e) => {
-            println!("Error opening file: {}", e);
+            println!("Error opening input file: {}", e);
             return;
         }
     };
+    let mut prev_channels = 0;
 
-    let res = vf.decode();
-    match res {
-        Ok(channels) => {
-            println!("Input has {} channel{}", channels.len(),
-                     if channels.len() != 1 {
-                         "s"
-                     } else {
-                         ""
-                     });
-        }
-        Err(EndOfStream) => {
-            return;
-        },
-        Err(e) => {
-            println!("Error decoding input: {}", e);
-            return;
+    loop {
+        let res = vf.decode();
+        match res {
+            Ok(channels) if channels.len() != prev_channels => {
+                println!("Input has {} channel{}", channels.len(),
+                         if channels.len() != 1 {
+                             "s"
+                         } else {
+                             ""
+                         });
+                prev_channels = channels.len();
+            }
+            Ok(_) => {}
+            Err(EndOfStream) => {
+                return;
+            },
+            Err(e) => {
+                println!("Error decoding input: {}", e);
+                return;
+            }
         }
     }
 }
