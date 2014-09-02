@@ -17,6 +17,7 @@ use std::ptr;
 use std::raw;
 use std::slice::raw::mut_buf_as_slice;
 
+#[allow(dead_code, non_snake_case)]
 mod ffi;
 
 pub type OVResult<T> = Result<T, OVError>;
@@ -75,7 +76,7 @@ pub struct VorbisFile<R> {
     src: R,
     decoder: ffi::OggVorbis_File,
     // Totally not 'static, but need a lifetime specifier to get a slice.
-    channels: Vec<&'static [f32]>,
+    channels: Vec<raw::Slice<f32>>,
 }
 
 /// File metadata
@@ -233,10 +234,12 @@ impl<R: Reader> VorbisFile<R> {
                     data: channel_buffer as *const f32,
                     len: n_samples as uint
                 };
-                self.channels.push(mem::transmute(channel_slice));
+                self.channels.push(channel_slice);
             };
         }
-        Ok(self.channels.as_slice())
+        Ok(unsafe {
+            mem::transmute(self.channels.as_slice())
+        })
     }
 
     /// Read `nmemb` items into `ptr` of `size` bytes each.

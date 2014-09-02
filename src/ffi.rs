@@ -1,25 +1,7 @@
-#![allow(dead_code, missing_doc, uppercase_variables)]
-
 use libc::{c_void, c_int, c_long, size_t, c_float, c_double, c_char};
 
 // There's a lot of leakage from libvorbis into libvorbisfile.
 // TODO expose both libvorbis and libvorbisfile APIs.
-
-#[link(name="vorbisfile")]
-extern "C" {
-    pub fn ov_open_callbacks(datasource: *mut c_void, vf: *mut OggVorbis_File,
-                         initial: *mut c_char, ibytes: c_long,
-                         callbacks: ov_callbacks) -> c_int;
-
-    pub fn ov_read_float(vf: *mut OggVorbis_File, pcm_channels: *mut *mut *mut c_float,
-                         samples: c_int, bitstream: *mut c_int) -> c_long;
-
-    pub fn ov_info(vf: *mut OggVorbis_File, link: c_int) -> *const vorbis_info;
-
-    pub fn ov_clear(vf: *mut OggVorbis_File) -> c_int;
-
-    pub fn ov_comment(vf: *mut OggVorbis_File, link: c_int) -> *const vorbis_comment;
-}
 
 pub static OV_FALSE: c_int = -1;
 pub static OV_HOLE: c_int = -3;
@@ -209,5 +191,21 @@ pub struct vorbis_dsp_state {
     res_bits: i64,
 
     backend_state: *mut c_void,
+}
+
+#[link(name="vorbisfile")]
+extern "C" {
+    pub fn ov_open_callbacks(datasource: *mut c_void, vf: *mut OggVorbis_File,
+                         initial: *mut c_char, ibytes: c_long,
+                         callbacks: ov_callbacks) -> c_int;
+
+    pub fn ov_read_float(vf: *mut OggVorbis_File, pcm_channels: *mut *mut *mut c_float,
+                         samples: c_int, bitstream: *mut c_int) -> c_long;
+
+    pub fn ov_info(vf: *mut OggVorbis_File, link: c_int) -> *const vorbis_info;
+
+    pub fn ov_clear(vf: *mut OggVorbis_File) -> c_int;
+
+    pub fn ov_comment(vf: *mut OggVorbis_File, link: c_int) -> *const vorbis_comment;
 }
 
