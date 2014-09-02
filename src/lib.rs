@@ -200,7 +200,7 @@ impl<R: Reader> VorbisFile<R> {
     ///
     /// The emitted values are a slice of channels, each containing an equal
     /// number of samples.
-    pub fn decode<'a>(&'a mut self) -> OVResult<&'a [&'a [f32]]> {
+    pub fn decode<'a>(&'a mut self) -> OVResult<&'a [&'a mut [f32]]> {
         let max_samples = 4096;
         self.callback_setup();
         let mut sample_buffer: *mut *mut f32 = unsafe {
