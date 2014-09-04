@@ -42,7 +42,7 @@ fn main() {
     loop {
         let res = vf.decode();
         match res {
-            Ok(channels) if channels.len() != prev_channels => {
+            Ok(ref channels) if channels.len() != prev_channels => {
                 println!("Input has {} channel{}", channels.len(),
                          if channels.len() != 1 {
                              "s"
