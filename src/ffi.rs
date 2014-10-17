@@ -3,19 +3,19 @@ use libc::{c_void, c_int, c_long, size_t, c_float, c_double, c_char};
 // There's a lot of leakage from libvorbis into libvorbisfile.
 // TODO expose both libvorbis and libvorbisfile APIs.
 
-pub static OV_FALSE: c_int = -1;
-pub static OV_HOLE: c_int = -3;
-pub static OV_EREAD: c_int = -128;
-pub static OV_EFAULT: c_int = -129;
-pub static OV_EIMPL: c_int = -130;
-pub static OV_EINVAL: c_int = -131;
-pub static OV_ENOTVORBIS: c_int = -132;
-pub static OV_EBADHEADER: c_int = -133;
-pub static OV_EVERSION: c_int = -134;
-pub static OV_ENOTAUDIO: c_int = -135;
-pub static OV_EBADPACKET: c_int = -136;
-pub static OV_EBADLINK: c_int = -137;
-pub static OV_ENOSEEK: c_int = -138;
+pub const OV_FALSE: c_int = -1;
+pub const OV_HOLE: c_int = -3;
+pub const OV_EREAD: c_int = -128;
+pub const OV_EFAULT: c_int = -129;
+pub const OV_EIMPL: c_int = -130;
+pub const OV_EINVAL: c_int = -131;
+pub const OV_ENOTVORBIS: c_int = -132;
+pub const OV_EBADHEADER: c_int = -133;
+pub const OV_EVERSION: c_int = -134;
+pub const OV_ENOTAUDIO: c_int = -135;
+pub const OV_EBADPACKET: c_int = -136;
+pub const OV_EBADLINK: c_int = -137;
+pub const OV_ENOSEEK: c_int = -138;
 
 #[repr(C)]
 pub struct OggVorbis_File {
