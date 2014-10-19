@@ -6,7 +6,6 @@
 
 //! Ogg Vorbis file decoding, library bindings.
 
-extern crate debug;
 extern crate libc;
 use libc::{c_void, c_int, c_long, size_t};
 
@@ -134,7 +133,7 @@ impl<R: Reader> VorbisFile<R> {
         let status = unsafe {
             ffi::ov_open_callbacks(&mut vf.src as *mut _ as *mut c_void, 
                                    &mut vf.decoder as *mut _,
-                                   ptr::mut_null(), 0, callbacks)
+                                   ptr::null_mut(), 0, callbacks)
         };
 
         match status {
