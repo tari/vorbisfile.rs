@@ -65,7 +65,7 @@ impl OVError {
             ffi::OV_EVERSION => UnsupportedVersion,
             ffi::OV_EBADLINK => CorruptLink,
             ffi::OV_ENOSEEK => NotSeekable,
-            x => fail!("Unexpected OVError code: {}", x)
+            x => panic!("Unexpected OVError code: {}", x)
         }
     }
 }
