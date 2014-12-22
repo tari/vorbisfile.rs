@@ -20,32 +20,32 @@ pub const OV_ENOSEEK: c_int = -138;
 #[repr(C)]
 pub struct OggVorbis_File {
     pub datasource: *mut c_void,
-    seekable: c_int,
-    offset: i64,
-    end: i64,
-    oy: ogg_sync_state,
+    pub seekable: c_int,
+    pub offset: i64,
+    pub end: i64,
+    pub oy: ogg_sync_state,
 
-    links: int,
-    offsets: *mut i64,
-    dataoffsets: *mut i64,
-    serialnos: *mut c_long,
-    pcmlengths: *mut i64,
-    vi: *mut vorbis_info,
-    vc: *mut vorbis_comment,
+    pub links: int,
+    pub offsets: *mut i64,
+    pub dataoffsets: *mut i64,
+    pub serialnos: *mut c_long,
+    pub pcmlengths: *mut i64,
+    pub vi: *mut vorbis_info,
+    pub vc: *mut vorbis_comment,
 
-    pcm_offset: i64,
-    ready_state: c_int,
-    current_serialno: c_long,
-    current_link: c_int,
+    pub pcm_offset: i64,
+    pub ready_state: c_int,
+    pub current_serialno: c_long,
+    pub current_link: c_int,
 
-    bittrack: c_double,
-    samptrack: c_double,
+    pub bittrack: c_double,
+    pub samptrack: c_double,
 
-    os: ogg_stream_state,
-    vd: vorbis_dsp_state,
-    vb: vorbis_block,
+    pub os: ogg_stream_state,
+    pub vd: vorbis_dsp_state,
+    pub vb: vorbis_block,
 
-    callbacks: ov_callbacks,
+    pub callbacks: ov_callbacks,
 }
 
 #[repr(C)]

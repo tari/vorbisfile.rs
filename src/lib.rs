@@ -1,7 +1,7 @@
 #![crate_name = "libvorbisfile"]
 #![doc(html_root_url = "http://www.rust-ci.org/tari/vorbisfile.rs/doc/libvorbisfile/")]
 
-#![deny(dead_code, missing_doc)]
+#![deny(dead_code, missing_docs)]
 #![feature(unsafe_destructor)]
 
 //! Ogg Vorbis file decoding, library bindings.
@@ -14,11 +14,12 @@ use std::mem;
 use std::str;
 use std::ptr;
 use std::raw;
-use std::slice::raw::mut_buf_as_slice;
+use std::slice::from_raw_mut_buf;
 
 #[allow(dead_code, non_snake_case)]
 mod ffi;
 
+/// `OVError` or `T`.
 pub type OVResult<T> = Result<T, OVError>;
 
 /// Decode error.
@@ -52,19 +53,21 @@ pub enum OVError {
     NotSeekable,
 }
 
+impl Copy for OVError { }
+
 impl OVError {
     fn from_native(code: c_int) -> OVError {
         match code {
-            ffi::OV_HOLE => StreamInterrupted,
-            ffi::OV_EREAD => ReadError,
-            ffi::OV_EFAULT => InternalFault,
-            ffi::OV_EIMPL => NotImplemented,
-            ffi::OV_EINVAL => InvalidArgument,
-            ffi::OV_ENOTVORBIS => NotVorbis,
-            ffi::OV_EBADHEADER => InvalidHeader,
-            ffi::OV_EVERSION => UnsupportedVersion,
-            ffi::OV_EBADLINK => CorruptLink,
-            ffi::OV_ENOSEEK => NotSeekable,
+            ffi::OV_HOLE => OVError::StreamInterrupted,
+            ffi::OV_EREAD => OVError::ReadError,
+            ffi::OV_EFAULT => OVError::InternalFault,
+            ffi::OV_EIMPL => OVError::NotImplemented,
+            ffi::OV_EINVAL => OVError::InvalidArgument,
+            ffi::OV_ENOTVORBIS => OVError::NotVorbis,
+            ffi::OV_EBADHEADER => OVError::InvalidHeader,
+            ffi::OV_EVERSION => OVError::UnsupportedVersion,
+            ffi::OV_EBADLINK => OVError::CorruptLink,
+            ffi::OV_ENOSEEK => OVError::NotSeekable,
             x => panic!("Unexpected OVError code: {}", x)
         }
     }
@@ -86,17 +89,17 @@ pub struct Comments<'a> {
     pub comments: Vec<&'a str>
 }
 
-#[allow(unused_variable)]
+#[allow(unused_variables)]
 extern "C" fn seek(datasource: *mut c_void, offset: i64, whence: c_int) -> c_int {
     // TODO permit seeking
     -1
 }
-#[allow(unused_variable)]
+#[allow(unused_variables)]
 extern "C" fn close(datasource: *mut c_void) -> c_int {
     // No need to do anything. VorbisFile owns the Reader we're using.
     0
 }
-#[allow(unused_variable)]
+#[allow(unused_variables)]
 extern "C" fn tell(datasource: *mut c_void) -> c_long {
     // TODO permit seeking
     -1
@@ -140,8 +143,10 @@ impl<R: Reader> VorbisFile<R> {
             0 => Ok(vf),
             f => {
                 // Must not run the destructor. decoder is still uninitialized.
+                // XXX if VorbisFile's Drop impl does more than freeing self.decoder,
+                // this must also be updated.
                 unsafe {
-                    mem::forget(vf.decoder);
+                    mem::forget(vf);
                 }
                 Err(OVError::from_native(f))
             }
@@ -155,11 +160,9 @@ impl<R: Reader> VorbisFile<R> {
     /// bitstream.
     pub fn comment<'a>(&'a mut self, link: int) -> Option<Comments<'a>> {
         let cm = unsafe {
-            let p = ffi::ov_comment(&mut self.decoder, link as c_int);
-            if p.is_null() {
-                return None;
-            } else {
-                *p
+            match ffi::ov_comment(&mut self.decoder, link as c_int).as_ref() {
+                Some(r) => r,
+                None => return None
             }
         };
 
@@ -177,7 +180,7 @@ impl<R: Reader> VorbisFile<R> {
             },
             comments: unsafe {
                 let mut v = Vec::with_capacity(cm.comments as uint);
-                for i in range(0, cm.comments) {
+                for i in range(0, (*cm).comments) {
                     let len = *cm.comment_lengths.offset(i as int);
                     match make_str(*cm.user_comments.offset(i as int) as *const _,
                                    len as uint) {
@@ -213,7 +216,7 @@ impl<R: Reader> VorbisFile<R> {
             match ffi::ov_read_float(&mut self.decoder, &mut sample_buffer,
                                      max_samples, &mut bitstream_idx) {
                 0 => {
-                    return Err(EndOfStream);
+                    return Err(OVError::EndOfStream);
                 }
                 x if x < 0 => {
                     return Err(OVError::from_native(x as c_int));
@@ -252,13 +255,13 @@ impl<R: Reader> VorbisFile<R> {
 
         for i in range(0, nmemb) {
             let more = unsafe {
-                mut_buf_as_slice(ptr.offset(i as int), size as uint, |buf| {
-                    match vf.src.read_at_least(size as uint, buf) {
-                        Ok(_) => true,
-                        // Assume errno is set under the covers.
-                        Err(_) => false
-                    }
-                })
+                let bufp = ptr.offset(i as int);
+                let buf = from_raw_mut_buf(&bufp, size as uint);
+                match vf.src.read_at_least(size as uint, buf) {
+                    Ok(_) => true,
+                    // Assume errno is set under the covers.
+                    Err(_) => false
+                }
             };
             if !more {
                 // Got error, which might be EOF.
