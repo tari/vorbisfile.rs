@@ -1,4 +1,3 @@
-#![crate_name = "libvorbisfile"]
 #![doc(html_root_url = "http://www.rust-ci.org/tari/vorbisfile.rs/doc/libvorbisfile/")]
 
 #![deny(dead_code, missing_docs)]

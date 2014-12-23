@@ -1,4 +1,4 @@
 [package]
-name = "libvorbisfile"
+name = "vorbisfile"
 version = "0.1.0"
 authors = [ "Peter Marheine <peter@taricorp.net>" ]

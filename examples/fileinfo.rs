@@ -1,6 +1,6 @@
-extern crate libvorbisfile;
+extern crate vorbisfile;
 
-use libvorbisfile::{VorbisFile, EndOfStream};
+use vorbisfile::{VorbisFile, OVError};
 use std::io;
 
 fn main() {
@@ -52,7 +52,7 @@ fn main() {
                 prev_channels = channels.len();
             }
             Ok(_) => {}
-            Err(EndOfStream) => {
+            Err(OVError::EndOfStream) => {
                 return;
             },
             Err(e) => {
