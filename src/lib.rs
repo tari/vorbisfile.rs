@@ -52,6 +52,24 @@ pub enum OVError {
     NotSeekable,
 }
 
+impl std::error::Error for OVError {
+    fn description(&self) -> &str {
+        match *self {
+            OVError::EndOfStream => "End of stream",
+            OVError::StreamInterrupted => "Stream interrupted",
+            OVError::ReadError => "Read error",
+            OVError::InternalFault => "Internal library fault",
+            OVError::NotImplemented => "Feature not implemented",
+            OVError::InvalidArgument => "Invalid argument",
+            OVError::NotVorbis => "Not a Vorbis stream",
+            OVError::InvalidHeader => "Invalid Vorbis header",
+            OVError::UnsupportedVersion => "Bitstream format revision not supported",
+            OVError::CorruptLink => "Vorbis link is corrupt",
+            OVError::NotSeekable => "Not seekable",
+        }
+    }
+}
+
 impl Copy for OVError { }
 
 impl OVError {
