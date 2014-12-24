@@ -188,7 +188,7 @@ impl<R: Reader> VorbisFile<R> {
                 data: data,
                 len: len
             };
-            str::from_utf8(mem::transmute(slice))
+            str::from_utf8(mem::transmute(slice)).ok()
         }
 
         Some(Comments {
