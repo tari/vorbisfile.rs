@@ -1,13 +1,14 @@
 extern crate vorbisfile;
 
 use vorbisfile::{VorbisFile, OVError};
+use std::error::Error;
 use std::io;
 
 fn main() {
     let mut vf = match VorbisFile::new(io::stdin()) {
         Ok(f) => f,
         Err(e) => {
-            println!("Error opening input file: {}", e);
+            println!("Error opening input file: {}", e.description());
             return;
         }
     };
@@ -56,7 +57,7 @@ fn main() {
                 return;
             },
             Err(e) => {
-                println!("Error decoding input: {}", e);
+                println!("Error decoding input: {}", e.description());
                 return;
             }
         }
