@@ -25,7 +25,7 @@ pub struct OggVorbis_File {
     pub end: i64,
     pub oy: ogg_sync_state,
 
-    pub links: int,
+    pub links: c_int,
     pub offsets: *mut i64,
     pub dataoffsets: *mut i64,
     pub serialnos: *mut c_long,
@@ -127,7 +127,7 @@ pub struct ogg_stream_state {
     lacing_packet: c_long,
     lacing_returned: c_long,
 
-    header: [c_char, ..282],
+    header: [c_char; 282],
     header_fill: c_int,
 
     e_o_s: c_int,

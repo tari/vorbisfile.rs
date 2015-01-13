@@ -2,13 +2,15 @@
 
 #![deny(dead_code, missing_docs)]
 #![feature(unsafe_destructor)]
+#![allow(unstable)]
 
 //! Ogg Vorbis file decoding, library bindings.
 
 extern crate libc;
-use libc::{c_void, c_int, c_long, size_t};
+use libc::{c_void, c_int, c_long, size_t, c_char};
 
-use std::c_str::CString;
+use std::error::Error;
+use std::ffi::c_str_to_bytes;
 use std::mem;
 use std::str;
 use std::ptr;
@@ -22,11 +24,11 @@ mod ffi;
 pub type OVResult<T> = Result<T, OVError>;
 
 /// Decode error.
-#[deriving(Show, Clone)]
+#[derive(Show, Clone)]
 pub enum OVError {
     /// Reached end of file.
     EndOfStream,
-    /// Encounted missing or corrupt data.
+    /// Encountered missing or corrupt data.
     ///
     /// Recovery from this error is usually automatic and is returned for
     /// informational purposes only.
@@ -52,7 +54,7 @@ pub enum OVError {
     NotSeekable,
 }
 
-impl std::error::Error for OVError {
+impl Error for OVError {
     fn description(&self) -> &str {
         match *self {
             OVError::EndOfStream => "End of stream",
@@ -101,7 +103,7 @@ pub struct VorbisFile<R> {
 /// File metadata
 pub struct Comments<'a> {
     /// The Vorbis implementation that encoded the stream.
-    pub vendor: CString,
+    pub vendor: &'a str,
     /// User-specified key-value pairs of the form KEY=VALUE.
     pub comments: Vec<&'a str>
 }
@@ -175,7 +177,7 @@ impl<R: Reader> VorbisFile<R> {
     /// For nonseekable streams, returns the comments for the current
     /// bitstream. Otherwise, specify bitstream -1 to get the current
     /// bitstream.
-    pub fn comment<'a>(&'a mut self, link: int) -> Option<Comments<'a>> {
+    pub fn comment<'a>(&'a mut self, link: isize) -> Option<Comments<'a>> {
         let cm = unsafe {
             match ffi::ov_comment(&mut self.decoder, link as c_int).as_ref() {
                 Some(r) => r,
@@ -183,7 +185,7 @@ impl<R: Reader> VorbisFile<R> {
             }
         };
 
-        unsafe fn make_str<'a>(data: *const u8, len: uint) -> Option<&'a str> {
+        unsafe fn make_str<'a>(data: *const u8, len: usize) -> Option<&'a str> {
             let slice = raw::Slice {
                 data: data,
                 len: len
@@ -193,14 +195,21 @@ impl<R: Reader> VorbisFile<R> {
 
         Some(Comments {
             vendor: unsafe {
-                CString::new(cm.vendor as *const _, false)
+                // cm.vendor has a logical lifetime valid as long as self is not mutated
+                let vendor_raw: &'a *const c_char = mem::copy_lifetime(self, &(cm.vendor as *const _));
+                match str::from_utf8(c_str_to_bytes(vendor_raw)) {
+                    Ok(x) => x,
+                    Err(_) => "<INVALID>"
+                }
             },
             comments: unsafe {
-                let mut v = Vec::with_capacity(cm.comments as uint);
+                // Collect user comments, ignoring ones that are invalid UTF-8.
+                // These are length-prefixed (not C strings).
+                let mut v = Vec::with_capacity(cm.comments as usize);
                 for i in range(0, (*cm).comments) {
-                    let len = *cm.comment_lengths.offset(i as int);
-                    match make_str(*cm.user_comments.offset(i as int) as *const _,
-                                   len as uint) {
+                    let len = *cm.comment_lengths.offset(i as isize);
+                    match make_str(*cm.user_comments.offset(i as isize) as *const _,
+                                   len as usize) {
                         Some(s) => {
                             v.push(s);
                         }
@@ -248,10 +257,10 @@ impl<R: Reader> VorbisFile<R> {
         self.channels.truncate(0);
         for i in range(0, n_channels) {
             unsafe {
-                let channel_buffer = *sample_buffer.offset(i as int);
+                let channel_buffer = *sample_buffer.offset(i as isize);
                 let channel_slice = raw::Slice::<f32> {
                     data: channel_buffer as *const f32,
-                    len: n_samples as uint
+                    len: n_samples as usize
                 };
                 self.channels.push(channel_slice);
             };
@@ -272,9 +281,9 @@ impl<R: Reader> VorbisFile<R> {
 
         for i in range(0, nmemb) {
             let more = unsafe {
-                let bufp = ptr.offset(i as int);
-                let buf = from_raw_mut_buf(&bufp, size as uint);
-                match vf.src.read_at_least(size as uint, buf) {
+                let bufp = ptr.offset(i as isize);
+                let buf = from_raw_mut_buf(&bufp, size as usize);
+                match vf.src.read_at_least(size as usize, buf) {
                     Ok(_) => true,
                     // Assume errno is set under the covers.
                     Err(_) => false
