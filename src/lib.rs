@@ -11,6 +11,7 @@ use libc::{c_void, c_int, c_long, size_t, c_char};
 
 use std::error::Error;
 use std::ffi::c_str_to_bytes;
+use std::fmt;
 use std::mem;
 use std::str;
 use std::ptr;
@@ -69,6 +70,12 @@ impl Error for OVError {
             OVError::CorruptLink => "Vorbis link is corrupt",
             OVError::NotSeekable => "Not seekable",
         }
+    }
+}
+
+impl fmt::Display for OVError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        f.write_str(self.description())
     }
 }
 
