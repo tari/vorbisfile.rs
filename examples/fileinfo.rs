@@ -1,3 +1,5 @@
+#![feature(core)]
+
 extern crate vorbisfile;
 
 use vorbisfile::{VorbisFile, OVError};
@@ -25,9 +27,9 @@ fn main() {
                         println!("\t {}", comment);
                     }
                     Some(i) => {
-                        println!("\t {}: {}", comment.slice_to(i),
+                        println!("\t {}: {}", &comment[..i],
                                  if i < comment.len() {
-                                     comment.slice_from(i + 1)
+                                     &comment[i + 1..]
                                  } else {
                                      ""
                                  });

@@ -1,22 +1,22 @@
 #![doc(html_root_url = "http://www.rust-ci.org/tari/vorbisfile.rs/doc/libvorbisfile/")]
 
 #![deny(dead_code, missing_docs)]
-#![feature(unsafe_destructor)]
-#![allow(unstable)]
+#![feature(unsafe_destructor, libc, core)]
 
 //! Ogg Vorbis file decoding, library bindings.
 
 extern crate libc;
-use libc::{c_void, c_int, c_long, size_t, c_char};
+use libc::{c_void, c_int, c_long, size_t};
 
 use std::error::Error;
-use std::ffi::c_str_to_bytes;
+use std::ffi::CStr;
 use std::fmt;
+use std::io::Read;
 use std::mem;
 use std::str;
 use std::ptr;
 use std::raw;
-use std::slice::from_raw_mut_buf;
+use std::slice::from_raw_parts_mut;
 
 #[allow(dead_code, non_snake_case)]
 mod ffi;
@@ -25,7 +25,7 @@ mod ffi;
 pub type OVResult<T> = Result<T, OVError>;
 
 /// Decode error.
-#[derive(Show, Clone)]
+#[derive(Debug, Clone)]
 pub enum OVError {
     /// Reached end of file.
     EndOfStream,
@@ -133,7 +133,7 @@ extern "C" fn tell(datasource: *mut c_void) -> c_long {
 
 // Don't expose ov_fopen and friends because that won't play nicely
 // with non-libnative runtime.
-impl<R: Reader> VorbisFile<R> {
+impl<R: Read> VorbisFile<R> {
     /// Ensures the FFI struct is consistent for callback invocation.
     ///
     /// Because the user may move this struct, the `datasource` pointer
@@ -202,18 +202,16 @@ impl<R: Reader> VorbisFile<R> {
 
         Some(Comments {
             vendor: unsafe {
-                // cm.vendor has a logical lifetime valid as long as self is not mutated
-                let vendor_raw: &'a *const c_char = mem::copy_lifetime(self, &(cm.vendor as *const _));
-                match str::from_utf8(c_str_to_bytes(vendor_raw)) {
+                match str::from_utf8(CStr::from_ptr(cm.vendor).to_bytes()) {
                     Ok(x) => x,
-                    Err(_) => "<INVALID>"
+                    Err(_) => "<INVALID UTF-8>"
                 }
             },
             comments: unsafe {
                 // Collect user comments, ignoring ones that are invalid UTF-8.
                 // These are length-prefixed (not C strings).
                 let mut v = Vec::with_capacity(cm.comments as usize);
-                for i in range(0, (*cm).comments) {
+                for i in 0..(*cm).comments {
                     let len = *cm.comment_lengths.offset(i as isize);
                     match make_str(*cm.user_comments.offset(i as isize) as *const _,
                                    len as usize) {
@@ -262,7 +260,7 @@ impl<R: Reader> VorbisFile<R> {
         };
 
         self.channels.truncate(0);
-        for i in range(0, n_channels) {
+        for i in 0..n_channels {
             unsafe {
                 let channel_buffer = *sample_buffer.offset(i as isize);
                 let channel_slice = raw::Slice::<f32> {
@@ -283,21 +281,28 @@ impl<R: Reader> VorbisFile<R> {
     /// a read error. Otherwise, reached EOF.
     extern "C" fn read(buffer: *mut c_void, size: size_t, nmemb: size_t,
                        datasource: *mut c_void) -> size_t {
-        let vf: &mut VorbisFile<R> = unsafe { mem::transmute(datasource) };
+        let vf: *mut VorbisFile<R> = unsafe { mem::transmute(datasource) };
         let ptr = buffer as *mut u8;
 
-        for i in range(0, nmemb) {
+        for i in 0..nmemb {
             let more = unsafe {
                 let bufp = ptr.offset(i as isize);
-                let buf = from_raw_mut_buf(&bufp, size as usize);
-                match vf.src.read_at_least(size as usize, buf) {
-                    Ok(_) => true,
-                    // Assume errno is set under the covers.
-                    Err(_) => false
+                let buf = from_raw_parts_mut(bufp, size as usize);
+                match (*vf).src.by_ref().take(size).read(buf) {
+                    Ok(n) if n == (size as usize) => true,
+                    // Assume errno is set under the covers in the Err case. Ok(0) is EOF.
+                    Ok(0) | Err(_) => false,
+                    // Stupid hack for partial reads: recurse for the rest of this element
+                    Ok(n) => {
+                        // This call forces us to make `vf` a raw pointer, because we're aliasing
+                        // `datasource` to `vf` so the mutable refs must not alias.
+                        VorbisFile::<R>::read(bufp as *mut _, size - n as size_t, 1, datasource);
+                        true
+                    }
                 }
             };
             if !more {
-                // Got error, which might be EOF.
+                // Hit EOF or I/O error. Don't even attempt futher reads
                 return i;
             }
         }
@@ -307,7 +312,7 @@ impl<R: Reader> VorbisFile<R> {
 }
 
 #[unsafe_destructor]
-impl<R: Reader> Drop for VorbisFile<R> {
+impl<R: Read> Drop for VorbisFile<R> {
     fn drop(&mut self) {
         self.callback_setup();
         unsafe {
