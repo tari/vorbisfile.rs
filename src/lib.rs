@@ -100,7 +100,7 @@ impl OVError {
 }
 
 /// Ogg Vorbis file decoder.
-pub struct VorbisFile<R> {
+pub struct VorbisFile<R: Read> {
     src: R,
     decoder: ffi::OggVorbis_File,
     // Totally not 'static, but need a lifetime specifier to get a slice.
@@ -161,7 +161,7 @@ impl<R: Read> VorbisFile<R> {
 
         let status = unsafe {
             ffi::ov_open_callbacks(&mut vf.src as *mut _ as *mut c_void, 
-                                   &mut vf.decoder as *mut _,
+                                   &mut vf.decoder,
                                    ptr::null_mut(), 0, callbacks)
         };
 
@@ -264,14 +264,14 @@ impl<R: Read> VorbisFile<R> {
             unsafe {
                 let channel_buffer = *sample_buffer.offset(i as isize);
                 let channel_slice = raw::Slice::<f32> {
-                    data: channel_buffer as *const f32,
+                    data: channel_buffer,
                     len: n_samples as usize
                 };
                 self.channels.push(channel_slice);
             };
         }
         Ok(unsafe {
-            mem::transmute(self.channels.as_slice())
+            mem::transmute(&self.channels[..])
         })
     }
 
