@@ -7,3 +7,6 @@ description = "Bindings to Xiph.org libvorbisfile for Ogg Vorbis."
 readme = "README.md"
 repository = "https://bitbucket.org/tari/vorbisfile.rs"
 license = "ISC"
+
+[dependencies]
+libc = "*"

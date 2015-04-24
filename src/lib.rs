@@ -1,7 +1,7 @@
 #![doc(html_root_url = "http://www.rust-ci.org/tari/vorbisfile.rs/doc/libvorbisfile/")]
 
 #![deny(dead_code, missing_docs)]
-#![feature(unsafe_destructor, libc, core)]
+#![feature(core)]
 
 //! Ogg Vorbis file decoding, library bindings.
 
@@ -311,7 +311,6 @@ impl<R: Read> VorbisFile<R> {
     }
 }
 
-#[unsafe_destructor]
 impl<R: Read> Drop for VorbisFile<R> {
     fn drop(&mut self) {
         self.callback_setup();
