@@ -1,5 +1,3 @@
-#![feature(core)]
-
 extern crate vorbisfile;
 
 use vorbisfile::{VorbisFile, OVError};

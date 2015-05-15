@@ -1,7 +1,6 @@
 #![doc(html_root_url = "http://www.rust-ci.org/tari/vorbisfile.rs/doc/libvorbisfile/")]
 
 #![deny(dead_code, missing_docs)]
-#![feature(core)]
 
 //! Ogg Vorbis file decoding, library bindings.
 
@@ -15,7 +14,6 @@ use std::io::Read;
 use std::mem;
 use std::str;
 use std::ptr;
-use std::raw;
 use std::slice::from_raw_parts_mut;
 
 #[allow(dead_code, non_snake_case)]
@@ -104,7 +102,7 @@ pub struct VorbisFile<R: Read> {
     src: R,
     decoder: ffi::OggVorbis_File,
     // Totally not 'static, but need a lifetime specifier to get a slice.
-    channels: Vec<raw::Slice<f32>>,
+    channels: Vec<&'static [f32]>,
 }
 
 /// File metadata
@@ -171,9 +169,7 @@ impl<R: Read> VorbisFile<R> {
                 // Must not run the destructor. decoder is still uninitialized.
                 // XXX if VorbisFile's Drop impl does more than freeing self.decoder,
                 // this must also be updated.
-                unsafe {
-                    mem::forget(vf);
-                }
+                mem::forget(vf);
                 Err(OVError::from_native(f))
             }
         }
@@ -186,23 +182,22 @@ impl<R: Read> VorbisFile<R> {
     /// bitstream.
     pub fn comment<'a>(&'a mut self, link: isize) -> Option<Comments<'a>> {
         let cm = unsafe {
-            match ffi::ov_comment(&mut self.decoder, link as c_int).as_ref() {
-                Some(r) => r,
-                None => return None
+            let p = ffi::ov_comment(&mut self.decoder, link as c_int);
+            if p.is_null() {
+                return None;
+            } else {
+                p
             }
         };
 
         unsafe fn make_str<'a>(data: *const u8, len: usize) -> Option<&'a str> {
-            let slice = raw::Slice {
-                data: data,
-                len: len
-            };
-            str::from_utf8(mem::transmute(slice)).ok()
+            let slice = std::slice::from_raw_parts(data, len);
+            str::from_utf8(slice).ok()
         }
 
         Some(Comments {
             vendor: unsafe {
-                match str::from_utf8(CStr::from_ptr(cm.vendor).to_bytes()) {
+                match str::from_utf8(CStr::from_ptr((*cm).vendor).to_bytes()) {
                     Ok(x) => x,
                     Err(_) => "<INVALID UTF-8>"
                 }
@@ -210,10 +205,10 @@ impl<R: Read> VorbisFile<R> {
             comments: unsafe {
                 // Collect user comments, ignoring ones that are invalid UTF-8.
                 // These are length-prefixed (not C strings).
-                let mut v = Vec::with_capacity(cm.comments as usize);
+                let mut v = Vec::with_capacity((*cm).comments as usize);
                 for i in 0..(*cm).comments {
-                    let len = *cm.comment_lengths.offset(i as isize);
-                    match make_str(*cm.user_comments.offset(i as isize) as *const _,
+                    let len = *(*cm).comment_lengths.offset(i as isize);
+                    match make_str(*(*cm).user_comments.offset(i as isize) as *const _,
                                    len as usize) {
                         Some(s) => {
                             v.push(s);
@@ -263,15 +258,12 @@ impl<R: Read> VorbisFile<R> {
         for i in 0..n_channels {
             unsafe {
                 let channel_buffer = *sample_buffer.offset(i as isize);
-                let channel_slice = raw::Slice::<f32> {
-                    data: channel_buffer,
-                    len: n_samples as usize
-                };
+                let channel_slice = std::slice::from_raw_parts(channel_buffer, n_samples as usize);
                 self.channels.push(channel_slice);
             };
         }
         Ok(unsafe {
-            mem::transmute(&self.channels[..])
+            mem::transmute(&mut self.channels[..])
         })
     }
 
