@@ -1,6 +1,6 @@
 [package]
 name = "vorbisfile"
-version = "0.2.1"
+version = "0.2.2"
 authors = [ "Peter Marheine <peter@taricorp.net>" ]
 
 description = "Bindings to Xiph.org libvorbisfile for Ogg Vorbis."
